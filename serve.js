@@ -1,8 +1,10 @@
 const http = require('http'), fs = require('fs'), path = require('path');
-const root = process.env.HOME + '/slowroads-web/build';
+const root = path.join(__dirname, 'build');
 const mime = { '.html':'text/html','.js':'text/javascript','.mjs':'text/javascript','.css':'text/css','.json':'application/json','.png':'image/png','.jpg':'image/jpeg','.webp':'image/webp','.svg':'image/svg+xml','.woff':'font/woff','.woff2':'font/woff2','.ttf':'font/ttf','.mp3':'audio/mpeg','.ogg':'audio/ogg','.wav':'audio/wav','.ico':'image/x-icon','.csv':'text/csv' };
 http.createServer((req, res) => {
   let p = decodeURIComponent(req.url.split('?')[0]);
+  if (p.startsWith('/slow-roads/')) p = p.slice('/slow-roads'.length) || '/';
+  if (p === '/slow-roads') p = '/index.html';
   if (p === '/') p = '/index.html';
   const f = path.join(root, p);
   if (!f.startsWith(root)) { res.writeHead(403); return res.end(); }
