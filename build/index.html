@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+
+		<link rel="icon" href="./favicon.svg" />
+		<link rel="apple-touch-icon" href="apple-touch-icon.png">
+		<!-- <link rel="icon" href="./favicon_dark.svg" type="image/x-icon" media="(prefers-color-scheme: dark)"> -->
+		<!-- <link rel="icon" href="./favicon_light.svg" type="image/x-icon" media="(prefers-color-scheme: light)"> -->
+		<link rel="preload" href="/fonts/Sono.ttf" as="font" type="font/ttf" crossorigin>
+		<link rel="preload" href="/fonts/Space.ttf" as="font" type="font/ttf" crossorigin>
+
+		<link rel="manifest" href="/manifest.json">
+
+		<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" >
+		<meta name="theme-color" content="#f4f2ed">
+		<meta name="title" content="Slow Roads">
+		<meta name="description" content="Endless driving zen">
+		<meta name="color-scheme" content="light only">
+
+		<!-- <title>&#8202;d&#8202;r&#8202;i&#8202;f&nbsp;t&nbsp;m&#8202;a&#8202;s&#8202;&#8202;2&#8202;5</title> -->
+		<title>Slow Roads</title>
+
+		<noscript>
+			This game requires JavaScript to work
+		</noscript>
+
+		<script>
+
+			Math.TAU = Math.PI*2;
+			Math.PIHALF = Math.PI/2;
+			Math.WORLDANGLE = Math.PI * 1.5; // Shouldn't really need this but...
+
+			Object.freeze(performance);
+			Object.freeze(Date);
+			Object.freeze(requestAnimationFrame);
+			Object.freeze(setTimeout);
+			Object.freeze(setInterval);
+
+			// Force focus on first load
+			window.focus();
+
+			// Gamepad override for pov hat?
+			const ggp = navigator.getGamepads.bind(navigator);
+
+			navigator.getGamepads = () => {
+				let gps = ggp();
+
+				return gps.map(g => {
+
+					if(!g) {
+						return null;
+					}
+
+					if(g.id.includes("Wheel")) {
+						g.isWheel = true;
+					}
+
+					if(g.id[0] == "G" && g.id[1] == "9" && g.axes.length == 10 && g.buttons.length == 18) {
+
+						g.isLogiWheel = true;
+
+						return new Proxy(g,  {
+							get(target, property) {
+
+								if(property === "buttons") {
+									const buttons = Array.from(target.buttons);
+									
+									let pov = target.axes[9];
+
+						
+									/*
+								
+										NEUTRAL: 1.28571
+										UP: -1
+										UPRIGHT: -0.71429
+										RIGHT: -0.42857
+										DOWNRIGHT: -0.14286
+										DOWN: 0.14286
+										DOWNLEFT: 0.42857
+										LEFT: 0.71429
+										UPLEFT: 1
+
+									*/
+
+
+									let povNeutral = pov > 1.2;
+									let up = !povNeutral && (pov < -0.5 || pov > 0.75);
+									let down = !povNeutral && (pov > -0.25 && pov < 0.5);
+									let left = !povNeutral && (pov > 0.25);
+									let right = !povNeutral && (pov  < 0 && pov > -0.8)
+
+									buttons.push(
+										{
+											pressed: up,
+											touched: up,
+											value: up ? 1 : 0
+										},
+										{
+											pressed: down,
+											touched: down,
+											value: down ? 1 : 0
+										},
+										{
+											pressed: left,
+											touched: left,
+											value: left ? 1 : 0
+										},
+										{
+											pressed: right,
+											touched: right,
+											value: right ? 1 : 0
+										},
+									)
+
+									return buttons;
+								}
+
+								if(property === "axes") {
+									let axes = Array.from(target.axes);
+									if(axes.length == 10) {
+										axes.pop();
+									}
+									return axes;
+								}
+
+								return Reflect.get(target, property);
+							}
+						})
+					} else {
+						return g;
+					}
+
+
+				});
+
+			}
+			
+		</script>
+
+		<style>
+
+			:root {
+				--sr-white: #F4F2ED;
+
+				--sr-white-0: #F4F2ED00;
+				--sr-white-10: #F4F2ED20;
+				--sr-white-25: #F4F2ED40;
+				--sr-white-50: #F4F2ED80;
+				--sr-white-60: #F4F2ED90;
+				--sr-white-75: #F4F2EDC0;
+				--sr-white-90: #F4F2EDE0;
+
+				--sr-primary: #343c3e;
+				--sr-primary-0: #343c3e00;
+				--sr-primary-10: #343c3e20;
+				--sr-primary-25: #343c3e40;
+				--sr-primary-50: #343c3e80;
+				--sr-primary-75: #343c3eC0;
+				--sr-primary-90: #343c3ee0;
+
+				--sr-secondary: #D2D1CD;
+				--sr-secondary-0: #D2D1CD00;
+				--sr-secondary-25: #D2D1CD40;
+				--sr-secondary-50: #D2D1CD80;
+				--sr-secondary-75: #D2D1CDC0;
+				--sr-secondary-90: #D2D1CDEE;
+
+				--sr-tertiary: #7e7c76;
+				--sr-tertiary-0: #7e7c7600;
+				--sr-tertiary-25: #7e7c7640;
+				--sr-tertiary-50: #7e7c7680;
+				--sr-tertiary-75: #7e7c76C0;
+				--sr-tertiary-90: #7e7c76EE;
+
+				--sr-warn: #ff992b;
+
+				--sr-dark: #444444;
+				--sr-darker: #333;
+				--sr-black: #222222;
+				--sr-black-75: #222222C0
+				--sr-black-50: #22222280;
+				--sr-black-25: #22222240;
+				--sr-black-0: #22222200;
+
+				--sr-bg: #F4F2ED;
+				--sr-lowlight: #343c3e80;
+
+				--sr-font-titles: Sono, Noto;
+				--sr-font-body: Space;
+
+
+
+				color-scheme: light only;
+			}
+
+			@font-face {
+				font-family: Sono;
+				src: url(/fonts/Sono.ttf);
+				font-variant: slashed-zero;
+			}
+
+			@font-face {
+				font-family: ZCOOL;
+				src: url(/fonts/NotoSans.ttf);
+				font-variant: slashed-zero;
+			}
+
+			@font-face {
+				font-family: Huninn;
+				src: url(/fonts/Inter.ttf);
+				font-variant: slashed-zero;
+			}
+
+			@font-face {
+				font-family: Noto;
+				src: url(/fonts/NotoSans.ttf);
+				font-variant: slashed-zero;
+			}
+
+			@font-face {
+				font-family: Space;
+				src: url(/fonts/Space.ttf);
+				font-variant: slashed-zero;
+			}
+
+			@font-face {
+				font-family: Inter;
+				src: url(/fonts/Inter.ttf);
+				font-variant: slashed-zero;
+			}
+
+			@font-face {
+				font-family: RobotoMono;
+				src: url(/fonts/RobotoMono.ttf);
+			}
+
+			@font-face {
+				font-family: LicensePlate;
+				src: url(/fonts/LicensePlate.ttf);
+			}
+
+			@font-face {
+				font-family: UKNumberPlate;
+				src: url(/fonts/CharlesWright.ttf);
+			}
+
+			@font-face {
+				font-family: CharlesWright;
+				src: url(/fonts/CharlesWright.ttf);
+			}
+
+			@font-face {
+				font-family: Anta;
+				src: url(/fonts/Anta-Regular.ttf)
+
+			}
+
+			@font-face {
+				font-family: Quantico;
+				src: url(/fonts/Quantico-Regular.ttf);
+			}
+
+			/* width */
+			::-webkit-scrollbar {
+				width: 0.6rem;
+			}
+
+			/* Track */
+			::-webkit-scrollbar-track {
+				background: var(--sr-white-50);
+			}
+
+			/* Handle */
+			::-webkit-scrollbar-thumb {
+				background: var(--sr-white-75);
+			}
+
+			/* Handle on hover */
+			::-webkit-scrollbar-thumb:hover {
+				background: var(--sr-white);
+			}
+
+			* {
+				margin: 0;
+				padding: 0;			
+				font-variant: slashed-zero;
+				 word-break: keep-all;
+		    }
+
+			body {
+				overflow: hidden;
+				font-family: Space, Helvetica, sans-serif;
+				background: var(--sr-primary);
+				cursor: none;
+			}
+
+			img {
+				-webkit-user-drag: none;
+				-khtml-user-drag: none;
+				-moz-user-drag: none;
+				-o-user-drag: none;
+				user-drag: none;
+			}
+
+			a {
+				text-decoration: none;
+			}
+
+			html {
+				position: fixed;
+				top: 0;
+				left: 0;
+				width: 100%;
+				height: 100%;
+				font-size: 16px;
+			}
+			
+
+			@media screen and (orientation: landscape) and (max-width: 1361px)  {
+				html {
+					font-size: 16px;
+				}
+			}
+
+			@media screen and (orientation: landscape) and (max-width: 1180px) {
+				html {
+					font-size: 14px;
+				}
+			}
+
+			@media screen and (orientation: portrait) and (max-width: 1180px) {
+				html {
+					font-size: 10px;
+				}
+			}
+
+			.ft-link:hover {
+				text-shadow: 0 0 0.5rem var(--sr-white);
+				cursor: pointer;
+			}
+
+			.ft-link {
+				color: var(--sr-white);
+			}
+
+		</style>
+
+		<script src="./web-shim.js"></script>
+		<script src="./alea.min.js"></script>
+		<script>
+			document.addEventListener("contextmenu", (e) => {e.preventDefault()})
+
+		</script>
+
+		
+		<link rel="modulepreload" href="./_app/immutable/entry/start.9ef212d0.js">
+		<link rel="modulepreload" href="./_app/immutable/chunks/scheduler.047e28a5.js">
+		<link rel="modulepreload" href="./_app/immutable/chunks/singletons.8234e4e5.js">
+		<link rel="modulepreload" href="./_app/immutable/chunks/index.cf3576ff.js">
+		<link rel="modulepreload" href="./_app/immutable/entry/app.09295edd.js">
+		<link rel="modulepreload" href="./_app/immutable/chunks/preload-helper.a4192956.js">
+		<link rel="modulepreload" href="./_app/immutable/chunks/index.fb0243fe.js">
+	</head>
+	<body data-sveltekit-preload-data="hover">
+		<div style="display: contents">
+			<script>
+				{
+					__sveltekit_e4lt3w = {
+						assets: ".",
+						base: "",
+						env: {"PUBLIC_DRIFTMAS":"false","PUBLIC_ELECTRON":"false","PUBLIC_STEAM":"false"}
+					};
+
+					const element = document.currentScript.parentElement;
+
+					Promise.all([
+						import("./_app/immutable/entry/start.9ef212d0.js"),
+						import("./_app/immutable/entry/app.09295edd.js")
+					]).then(([kit, app]) => {
+						kit.start(app, element);
+					});
+				}
+			</script>
+		</div>
+	</body>
+</html>
